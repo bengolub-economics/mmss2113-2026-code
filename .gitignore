@@ -1,0 +1,8 @@
+.DS_Store
+*.log
+.vscode/
+.idea/
+node_modules/
+
+# Private roster (emails, NetIDs, auth tokens). Kept local; pasted into the Sheet.
+config/roster.csv

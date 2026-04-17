@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMSS 2113 — Network Survey</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>MMSS 2113 Network Survey</h1>
+  <p>If you're a student, please use the personal link emailed to you. It looks like <code>form.html?token=…</code>.</p>
+  <p class="muted"><a href="admin.html">Admin dashboard →</a></p>
+  <p class="muted" id="data-links"></p>
+</main>
+<script>
+  // Show data links once CSVs have been published to docs/data/
+  fetch('data/all_networks.csv', {method: 'HEAD'}).then(r => {
+    if (r.ok) {
+      document.getElementById('data-links').innerHTML =
+        'Published CSVs: <a href="data/all_networks.csv">all_networks.csv</a> — or see the <a href="data/">data folder</a>.';
+    }
+  }).catch(() => {});
+</script>
+</body>
+</html>

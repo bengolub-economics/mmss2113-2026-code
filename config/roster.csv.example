@@ -1,0 +1,4 @@
+student_id,label,full_name,email,netid,token
+s001,Alice J.,"Johnson,Alice",alice@example.edu,ABC1234,
+s002,Bob S.,"Smith,Bob",bob@example.edu,DEF5678,
+s003,Carol Z.,"Zhang,Carol",carol@example.edu,GHI9012,
