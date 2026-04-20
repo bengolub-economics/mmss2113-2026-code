@@ -250,7 +250,7 @@
       });
       const data = await r.json();
       if (data.error) throw new Error(data.error);
-      resEl.textContent = `Saved (${data.done}/${data.total} total).`;
+      resEl.textContent = 'Saved.';
       resEl.className = 'result ok';
       const section = document.getElementById('section-' + networkId);
       if (section && !section.querySelector('.badge')) {
