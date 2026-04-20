@@ -35,18 +35,22 @@ Sample rows are seeded; replace them with your real data.
 
 ## 3. Fill in the roster and networks
 
-On the **roster** tab, add one row per student:
+On the **roster** tab, one row per student across five columns:
 
-| student_id | name          | email              | token |
-|-----------:|---------------|--------------------|-------|
-| s01        | Alice Johnson | alice@u.edu        | (leave blank — generated) |
-| s02        | Bob Smith     | bob@u.edu          |       |
-| …          | …             | …                  |       |
+| student_id | label         | full_name        | email        | token |
+|-----------:|---------------|------------------|--------------|-------|
+| s01        | Alice J.      | Johnson, Alice   | alice@u.edu  | (blank ok) |
+| s02        | Bob S.        | Smith, Bob       | bob@u.edu    |       |
+| …          | …             | …                | …            |       |
 
-- `student_id` is what will appear in the output CSV — pick anonymous IDs
-  (e.g. `s01`) if you don't want names leaking publicly.
-- Leave `token` blank; run `generateMissingTokens()` from the editor and every
-  blank token will be filled with a unique random string.
+- `student_id` is what appears in the `source_id` / `target_id` columns of
+  the output CSV. Use anonymous IDs if you don't want names in the public
+  CSV.
+- `label` is the short display name students see in the form and what
+  appears in the `source_name` / `target_name` columns of the CSV.
+- `full_name` is kept for your records only; not exposed to students.
+- Leave `token` blank and run `generateMissingTokens()` from the editor
+  to fill in unique random tokens.
 
 On the **networks** tab, edit the seeded rows. Each row defines one network:
 

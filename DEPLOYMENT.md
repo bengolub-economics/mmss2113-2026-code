@@ -17,19 +17,18 @@ Pre-filled for this specific deployment. For the generic walkthrough see
 
 ### 1. Fill the Sheet
 
-**`roster` tab.** Delete the three sample rows. Paste from your local
-`config/roster.csv` (kept private, gitignored). The Sheet needs these four
-columns — map from your CSV as follows:
+**`roster` tab.** Five columns in this order:
 
-| Sheet column | From your `roster.csv` |
-|--------------|------------------------|
-| `student_id` | `student_id`           |
-| `name`       | `label` (e.g. "Pranav A.") or `full_name` |
-| `email`      | `email`                |
-| `token`      | `token`                |
+| # | Column       | Content                                           |
+|---|--------------|---------------------------------------------------|
+| A | `student_id` | stable id for CSV output (e.g. `s001`)            |
+| B | `label`      | short display name shown to students (`Pranav A.`)|
+| C | `full_name`  | formal name (not shown in UI)                     |
+| D | `email`      | for `sendLinks()`                                 |
+| E | `token`      | auto-fill by running `generateMissingTokens` if blank |
 
-If you leave `token` blank, run the function `generateMissingTokens` from the
-editor to fill in unique tokens.
+Delete the sample rows and paste in your roster. If you leave `token`
+blank, run the function `generateMissingTokens` from the editor.
 
 **`networks` tab.** Edit the seeded rows (advice / friendship / status).
 `id` becomes the output filename (`advice.csv`, etc.). `title` and `prompt`

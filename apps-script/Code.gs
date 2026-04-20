@@ -2,7 +2,10 @@
  * MMSS 2113 Network Survey — Apps Script backend
  *
  * Sheets used (created by setup()):
- *   roster       — student_id | name | email | token
+ *   roster       — student_id | label | full_name | email | token
+ *                  (label is the short display name shown to students; full_name
+ *                   is the formal name kept for records. Only label is shown
+ *                   in form UI and in the published CSV.)
  *   networks     — id | title | prompt
  *   submissions  — token | network | timestamp | allocations_json
  *   config       — key | value   (published, release_mode)
@@ -65,10 +68,10 @@ function setup() {
 
   if (!ss.getSheetByName(ROSTER_SHEET)) {
     const s = ss.insertSheet(ROSTER_SHEET);
-    s.appendRow(['student_id', 'name', 'email', 'token']);
-    s.appendRow(['s01', 'Alice Johnson', 'alice@example.edu', generateTokenString()]);
-    s.appendRow(['s02', 'Bob Smith',     'bob@example.edu',   generateTokenString()]);
-    s.appendRow(['s03', 'Carol Zhang',   'carol@example.edu', generateTokenString()]);
+    s.appendRow(['student_id', 'label', 'full_name', 'email', 'token']);
+    s.appendRow(['s01', 'Alice J.', 'Johnson, Alice', 'alice@example.edu', generateTokenString()]);
+    s.appendRow(['s02', 'Bob S.',   'Smith, Bob',     'bob@example.edu',   generateTokenString()]);
+    s.appendRow(['s03', 'Carol Z.', 'Zhang, Carol',   'carol@example.edu', generateTokenString()]);
     s.setFrozenRows(1);
   }
   if (!ss.getSheetByName(NETWORKS_SHEET)) {
@@ -100,11 +103,12 @@ function setup() {
 }
 
 function generateMissingTokens() {
+  // Roster columns: A student_id | B label | C full_name | D email | E token
   const sheet = getSheet(ROSTER_SHEET);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] && !data[i][3]) {
-      sheet.getRange(i + 1, 4).setValue(generateTokenString());
+    if (data[i][0] && !data[i][4]) {
+      sheet.getRange(i + 1, 5).setValue(generateTokenString());
     }
   }
 }
@@ -419,15 +423,19 @@ function getSheet(name) {
 }
 
 function readRoster() {
+  // Roster columns: A student_id | B label | C full_name | D email | E token
+  // We expose `name` (= label) for UI and CSV, and keep `full_name` available
+  // in case downstream code wants the formal version.
   const data = getSheet(ROSTER_SHEET).getDataRange().getValues();
   const out = [];
   for (let i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
     out.push({
       student_id: String(data[i][0]),
-      name: String(data[i][1]),
-      email: String(data[i][2]),
-      token: String(data[i][3])
+      name:       String(data[i][1]),
+      full_name:  String(data[i][2]),
+      email:      String(data[i][3]),
+      token:      String(data[i][4])
     });
   }
   return out;
