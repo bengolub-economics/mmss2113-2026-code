@@ -23,13 +23,15 @@ This file walks through the full setup, top to bottom.
 ## 2. Run `setup()` to create the sheet tabs
 
 Back in `Code.gs`, select the function `setup` from the dropdown and click
-**Run**. You'll be asked to grant permissions — allow them. This creates four
-tabs in the Sheet:
+**Run**. You'll be asked to grant permissions — allow them. This creates
+five tabs in the Sheet:
 
-- `roster` — student_id, name, email, token
+- `roster` — student_id, label, full_name, email, token
 - `networks` — id, title, prompt
 - `submissions` — (auto-populated)
 - `config` — published (false), release_mode (auto)
+- `anon` — student_id, anon_id (hidden; the decoder ring for anonymized
+  publish output — keep the Sheet private)
 
 Sample rows are seeded; replace them with your real data.
 

@@ -52,12 +52,14 @@ Short version:
 ## Output
 
 One CSV per network at `docs/data/<network>.csv`, plus a combined
-`docs/data/all_networks.csv`:
+`docs/data/all_networks.csv`. Every node is an anonymous integer — the
+mapping from real students to these integers lives in a hidden `anon`
+tab in the private Sheet and never reaches the public site.
 
 ```
-network,source_id,source_name,target_id,target_name,weight
-advice,s01,Alice Johnson,s02,Bob Smith,40
-advice,s01,Alice Johnson,s03,Carol Zhang,60
+network,source,target,weight
+advice,3,17,40
+advice,3,24,60
 ...
 ```
 

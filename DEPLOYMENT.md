@@ -92,18 +92,26 @@ The public CSVs will be at:
 - `https://bengolub-economics.github.io/mmss2113-2026-code/data/all_networks.csv`
 - `https://bengolub-economics.github.io/mmss2113-2026-code/data/<network_id>.csv`
 
-## CSV schema
+## CSV schema (anonymized)
 
 ```
-network,source_id,source_name,target_id,target_name,weight
-advice,s001,Pranav A.,s002,Shriya B.,40
-advice,s001,Pranav A.,s003,Lewis B.,60
+network,source,target,weight
+advice,3,17,40
+advice,3,24,60
 ...
 ```
 
-`source_name` / `target_name` use whatever you put in the Sheet's `name`
-column. If you want fully anonymous output, use abstract `student_id`s
-(`s001`) as the `name` too, and the `_name` columns won't leak.
+Each student is mapped to a random integer in `{1, …, N}` (where `N` is
+the number of students in the `roster` tab) via a Fisher-Yates shuffle
+the first time `publishCSVs` runs. The mapping is stored in the hidden
+**`anon`** tab of the private Sheet and reused on every subsequent
+publish, so republishing never relabels nodes.
+
+Nothing in the public repo links these integers to real students — not
+names, not `s001`-style IDs, not emails. If the roster grows after the
+first publish, new students are assigned the next unused integer
+(`N+1`, `N+2`, …). The `anon` tab is the only decoder ring; keep the
+Sheet private.
 
 ## Troubleshooting
 

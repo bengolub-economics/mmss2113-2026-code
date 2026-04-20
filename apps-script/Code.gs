@@ -9,6 +9,9 @@
  *   networks     — id | title | prompt
  *   submissions  — token | network | timestamp | allocations_json
  *   config       — key | value   (published, release_mode)
+ *   anon         — student_id | anon_id   (hidden; the only decoder ring
+ *                  linking real students to the anonymous integer IDs
+ *                  used in the published CSVs)
  *
  * Script Properties (set by hand):
  *   ADMIN_TOKEN       — any secret string (used to access admin dashboard)
@@ -25,6 +28,7 @@ const ROSTER_SHEET = 'roster';
 const NETWORKS_SHEET = 'networks';
 const SUBMISSIONS_SHEET = 'submissions';
 const CONFIG_SHEET = 'config';
+const ANON_SHEET = 'anon'; // student_id -> random integer; never published
 
 /* ============================================================
  * HTTP entry points
@@ -96,6 +100,12 @@ function setup() {
     s.appendRow(['published', 'false']);
     s.appendRow(['release_mode', 'auto']); // 'auto' or 'manual'
     s.setFrozenRows(1);
+  }
+  if (!ss.getSheetByName(ANON_SHEET)) {
+    const s = ss.insertSheet(ANON_SHEET);
+    s.appendRow(['student_id', 'anon_id']);
+    s.setFrozenRows(1);
+    s.hideSheet(); // kept private; this is the decoder ring
   }
 
   // Convenience: ensure any roster row without a token gets one.
@@ -279,33 +289,118 @@ function getCompletionStatus() {
  * CSV generation + GitHub publish
  * ============================================================ */
 
+/**
+ * Build a stable, random student_id → anonymous integer mapping in the
+ * `anon` tab. Integers are drawn from {1, …, N} where N = roster size,
+ * assigned via a Fisher-Yates shuffle. Existing mappings are preserved
+ * (so republishing never changes node labels). If the roster grows after
+ * the first publish, new students get the smallest unused id.
+ *
+ * The `anon` tab stays inside the private Sheet and is hidden by default.
+ * It's the only place that links real identities to published node IDs.
+ */
+function ensureAnonIds() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ANON_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(ANON_SHEET);
+    sheet.appendRow(['student_id', 'anon_id']);
+    sheet.setFrozenRows(1);
+    sheet.hideSheet();
+  }
+
+  const roster = readRoster();
+  const data = sheet.getDataRange().getValues();
+  const mapping = {};
+  const used = new Set();
+  for (let i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    const sid = String(data[i][0]);
+    const aid = Number(data[i][1]);
+    if (Number.isInteger(aid)) {
+      mapping[sid] = aid;
+      used.add(aid);
+    }
+  }
+
+  const unassigned = roster.filter(r => !(r.student_id in mapping));
+  if (unassigned.length === 0) return mapping;
+
+  const N = roster.length;
+  const pool = [];
+  for (let i = 1; i <= N; i++) if (!used.has(i)) pool.push(i);
+  // If roster shrunk then grew, pool may be short; extend past N.
+  let fill = N + 1;
+  while (pool.length < unassigned.length) {
+    if (!used.has(fill)) pool.push(fill);
+    fill++;
+  }
+  // Fisher-Yates shuffle.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  // Also shuffle the unassigned students so assignment order itself
+  // doesn't leak information (e.g. sheet row order = last name order).
+  const shuffled = unassigned.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+  }
+  for (const r of shuffled) {
+    const aid = pool.shift();
+    sheet.appendRow([r.student_id, aid]);
+    mapping[r.student_id] = aid;
+  }
+  return mapping;
+}
+
 function publishCSVs() {
   const roster = readRoster();
   const networks = readNetworks();
   const submissions = readAllSubmissions();
   const tokenToId = Object.fromEntries(roster.map(r => [r.token, r.student_id]));
-  const idToName = Object.fromEntries(roster.map(r => [r.student_id, r.name]));
+  const anon = ensureAnonIds();
 
-  const allRows = [['network', 'source_id', 'source_name', 'target_id', 'target_name', 'weight']];
+  const header = ['network', 'source', 'target', 'weight'];
+  const allRows = [];
   for (const n of networks) {
-    const rows = [['network', 'source_id', 'source_name', 'target_id', 'target_name', 'weight']];
+    const rows = [];
     const mySubs = submissions.filter(s => s.network === n.id);
     for (const s of mySubs) {
       const srcId = tokenToId[s.token];
       if (!srcId) continue;
+      const src = anon[srcId];
+      if (src == null) continue;
       let alloc;
       try { alloc = JSON.parse(s.allocations_json || '{}'); } catch (_) { continue; }
       for (const target of Object.keys(alloc)) {
         const w = alloc[target];
-        const row = [n.id, srcId, idToName[srcId] || '', target, idToName[target] || '', w];
+        const tgt = anon[target];
+        if (tgt == null) continue;
+        const row = [n.id, src, tgt, w];
         rows.push(row);
         allRows.push(row);
       }
     }
-    const csv = rowsToCsv(rows);
-    githubPut('docs/data/' + n.id + '.csv', csv, 'Publish ' + n.id + ' network');
+    sortAnonRows(rows);
+    githubPut('docs/data/' + n.id + '.csv',
+              rowsToCsv([header].concat(rows)),
+              'Publish ' + n.id + ' network');
   }
-  githubPut('docs/data/all_networks.csv', rowsToCsv(allRows), 'Publish all networks');
+  sortAnonRows(allRows);
+  githubPut('docs/data/all_networks.csv',
+            rowsToCsv([header].concat(allRows)),
+            'Publish all networks');
+}
+
+function sortAnonRows(rows) {
+  // Deterministic order — prevents leaking submission-time ordering.
+  rows.sort((a, b) => {
+    if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1; // network id
+    if (a[1] !== b[1]) return a[1] - b[1];          // source
+    return a[2] - b[2];                              // target
+  });
 }
 
 function rowsToCsv(rows) {
