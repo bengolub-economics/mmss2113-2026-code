@@ -30,9 +30,19 @@ Pre-filled for this specific deployment. For the generic walkthrough see
 Delete the sample rows and paste in your roster. If you leave `token`
 blank, run the function `generateMissingTokens` from the editor.
 
-**`networks` tab.** Edit the seeded rows (advice / friendship / status).
-`id` becomes the output filename (`advice.csv`, etc.). `title` and `prompt`
-are what students see. Add, remove, or reword rows freely.
+**`networks` tab.** Five columns: `id`, `title`, `prompt`, `type`,
+`max_nominations`. `type` is either `allocation` (student divides 100
+points among classmates) or `nomination` (student picks up to
+`max_nominations` classmates by name, no weighting). The seeded rows
+include three allocation questions (advice / friendship / status) and
+two nomination questions (`info_hubs` / `party_broadcasters`, 5 picks
+each). Add / remove / reword freely. `id` becomes the filename.
+
+If your existing `networks` tab predates the nomination feature (only
+has `id`, `title`, `prompt`), run the function
+**`addNominationQuestions`** from the editor once — it adds the
+`type` and `max_nominations` columns, backfills existing rows to
+`type=allocation`, and appends the two nomination questions.
 
 ### 2. Set Script Properties
 

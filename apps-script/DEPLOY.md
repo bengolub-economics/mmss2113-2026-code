@@ -54,16 +54,28 @@ On the **roster** tab, one row per student across five columns:
 - Leave `token` blank and run `generateMissingTokens()` from the editor
   to fill in unique random tokens.
 
-On the **networks** tab, edit the seeded rows. Each row defines one network:
+On the **networks** tab, five columns per row:
 
-| id          | title      | prompt (shown to students)                                    |
-|-------------|------------|---------------------------------------------------------------|
-| advice      | Advice     | Divide 100 points among your classmates to indicate who …     |
-| friendship  | Friendship | Divide 100 points among your classmates based on how close …  |
-| status      | Status     | Divide 100 points among your classmates based on how much …   |
+| id                 | title             | prompt                              | type        | max_nominations |
+|--------------------|-------------------|-------------------------------------|-------------|-----------------|
+| advice             | Advice            | Divide 100 points among …           | allocation  | (blank)         |
+| friendship         | Friendship        | …                                   | allocation  | (blank)         |
+| status             | Status            | …                                   | allocation  | (blank)         |
+| info_hubs          | Information hubs  | List up to 5 …                      | nomination  | 5               |
+| party_broadcasters | Party broadcasters| List up to 5 …                      | nomination  | 5               |
 
-Add, remove, or reword rows as you like. The `id` becomes the filename
-(`advice.csv`, etc.).
+Two question types:
+- `allocation` — student divides 100 whole points among classmates.
+- `nomination` — student picks up to `max_nominations` classmates by
+  name (typeahead), no weighting. Output CSV rows have weight 1.
+
+`id` becomes the filename (`advice.csv`, `info_hubs.csv`, etc.). Add,
+remove, or reword as you like.
+
+If your existing Sheet was created before nomination support, run the
+function **`addNominationQuestions`** once from the editor. It extends
+the `networks` tab with the new columns and appends the two nomination
+rows idempotently.
 
 ## 4. Deploy as a web app
 

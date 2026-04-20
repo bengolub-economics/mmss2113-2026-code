@@ -114,6 +114,46 @@ button.secondary { background: var(--warn); }
   padding: 1.5rem;
 }
 
+/* Nomination UI */
+.noms { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.nom-slot {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.nom-num {
+  width: 1.5rem; text-align: right;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.nom-input {
+  flex: 1; min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border); border-radius: 4px;
+  font: inherit;
+}
+.nom-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+.nom-input.good {
+  border-color: var(--ok);
+  background: #f0fdf4;
+}
+.nom-input.bad {
+  border-color: var(--err);
+  background: #fef2f2;
+}
+.nom-clear {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 0 0.55rem; font-size: 1rem;
+  line-height: 1.8;
+  cursor: pointer;
+}
+.nom-clear:hover { background: #f3f4f6; color: var(--fg); }
+.nom-count { font-size: 0.875rem; color: var(--muted); }
+.nom-count.ok { color: var(--ok); }
+.nom-count.err { color: var(--err); }
+
 /* Admin */
 .admin-login {
   display: flex; align-items: center; gap: 0.5rem;

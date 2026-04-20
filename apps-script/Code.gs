@@ -6,7 +6,10 @@
  *                  (label is the short display name shown to students; full_name
  *                   is the formal name kept for records. Only label is shown
  *                   in form UI and in the published CSV.)
- *   networks     — id | title | prompt
+ *   networks     — id | title | prompt | type | max_nominations
+ *                  (type is 'allocation' [sum-to-100, default] or
+ *                   'nomination' [pick up to max_nominations classmates];
+ *                   for allocation rows leave max_nominations blank.)
  *   submissions  — token | network | timestamp | allocations_json
  *   config       — key | value   (published, release_mode)
  *   anon         — student_id | anon_id   (hidden; the only decoder ring
@@ -80,13 +83,22 @@ function setup() {
   }
   if (!ss.getSheetByName(NETWORKS_SHEET)) {
     const s = ss.insertSheet(NETWORKS_SHEET);
-    s.appendRow(['id', 'title', 'prompt']);
+    s.appendRow(['id', 'title', 'prompt', 'type', 'max_nominations']);
     s.appendRow(['advice', 'Advice',
-      'Divide 100 points among your classmates to indicate who you would go to for advice on coursework. Give more points to those you would turn to more.']);
+      'Divide 100 points among your classmates to indicate who you would go to for advice on coursework. Give more points to those you would turn to more.',
+      'allocation', '']);
     s.appendRow(['friendship', 'Friendship',
-      'Divide 100 points among your classmates based on how close a friend each person is to you.']);
+      'Divide 100 points among your classmates based on how close a friend each person is to you.',
+      'allocation', '']);
     s.appendRow(['status', 'Status',
-      'Divide 100 points among your classmates based on how much status each person has in the class.']);
+      'Divide 100 points among your classmates based on how much status each person has in the class.',
+      'allocation', '']);
+    s.appendRow(['info_hubs', 'Information hubs',
+      'List up to 5 people in the class that are information hubs when it comes to professional/career information (whether you know that person well or not).',
+      'nomination', 5]);
+    s.appendRow(['party_broadcasters', 'Party broadcasters',
+      'List up to 5 people in the class that would be great candidates to get the word out about a party (whether you know that person well or not).',
+      'nomination', 5]);
     s.setFrozenRows(1);
   }
   if (!ss.getSheetByName(SUBMISSIONS_SHEET)) {
@@ -127,6 +139,51 @@ function generateTokenString() {
   // 12-char URL-safe token
   const bytes = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
   return bytes;
+}
+
+/**
+ * For already-deployed Sheets that were created before nomination questions
+ * existed. Idempotent: extends the `networks` tab with `type` and
+ * `max_nominations` columns, backfills existing rows to type='allocation',
+ * and appends the two hardcoded nomination questions if not already present.
+ * Run once from the editor after updating Code.gs.
+ */
+function addNominationQuestions() {
+  const sheet = getSheet(NETWORKS_SHEET);
+  const data = sheet.getDataRange().getValues();
+
+  // 1. Ensure header cells for columns D (type) and E (max_nominations).
+  if (!data[0] || data[0][3] !== 'type') sheet.getRange(1, 4).setValue('type');
+  if (!data[0] || data[0][4] !== 'max_nominations') sheet.getRange(1, 5).setValue('max_nominations');
+
+  // 2. Backfill existing rows with blank type -> 'allocation'.
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] && !data[i][3]) {
+      sheet.getRange(i + 1, 4).setValue('allocation');
+    }
+  }
+
+  // 3. Append the two nomination rows if missing.
+  const existingIds = new Set();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) existingIds.add(String(data[i][0]));
+  }
+  const rows = [
+    ['info_hubs', 'Information hubs',
+      'List up to 5 people in the class that are information hubs when it comes to professional/career information (whether you know that person well or not).',
+      'nomination', 5],
+    ['party_broadcasters', 'Party broadcasters',
+      'List up to 5 people in the class that would be great candidates to get the word out about a party (whether you know that person well or not).',
+      'nomination', 5]
+  ];
+  let added = 0;
+  for (const r of rows) {
+    if (!existingIds.has(r[0])) {
+      sheet.appendRow(r);
+      added++;
+    }
+  }
+  return 'Added ' + added + ' nomination question(s); networks tab now has type/max_nominations columns.';
 }
 
 /* ============================================================
@@ -170,16 +227,11 @@ function handleSubmit(body) {
   if (!net) throw new Error('Invalid network');
 
   const classmateIds = new Set(roster.filter(r => r.token !== token).map(r => r.student_id));
-  let sum = 0;
-  for (const target of Object.keys(allocations)) {
-    const w = allocations[target];
-    if (!classmateIds.has(target)) throw new Error('Invalid target: ' + target);
-    if (typeof w !== 'number' || !Number.isFinite(w) || Math.floor(w) !== w || w < 0 || w > 100) {
-      throw new Error('Weights must be integers between 0 and 100');
-    }
-    sum += w;
+  if (net.type === 'nomination') {
+    validateNomination(allocations, classmateIds, net.max_nominations);
+  } else {
+    validateAllocation(allocations, classmateIds);
   }
-  if (sum !== 100) throw new Error('Allocations must sum to 100 (got ' + sum + ')');
 
   upsertSubmission(token, network, allocations);
 
@@ -196,6 +248,32 @@ function handleSubmit(body) {
   }
 
   return Object.assign({ ok: true }, status);
+}
+
+function validateAllocation(allocations, classmateIds) {
+  let sum = 0;
+  for (const target of Object.keys(allocations)) {
+    const w = allocations[target];
+    if (!classmateIds.has(target)) throw new Error('Invalid target: ' + target);
+    if (typeof w !== 'number' || !Number.isFinite(w) || Math.floor(w) !== w || w < 0 || w > 100) {
+      throw new Error('Weights must be integers between 0 and 100');
+    }
+    sum += w;
+  }
+  if (sum !== 100) throw new Error('Allocations must sum to 100 (got ' + sum + ')');
+}
+
+function validateNomination(allocations, classmateIds, maxNoms) {
+  const keys = Object.keys(allocations);
+  if (maxNoms > 0 && keys.length > maxNoms) {
+    throw new Error('Too many nominations (max ' + maxNoms + ', got ' + keys.length + ')');
+  }
+  for (const target of keys) {
+    if (!classmateIds.has(target)) throw new Error('Invalid nominee: ' + target);
+    if (allocations[target] !== 1) {
+      throw new Error('Nomination weights must be exactly 1');
+    }
+  }
 }
 
 function upsertSubmission(token, network, allocations) {
@@ -537,14 +615,20 @@ function readRoster() {
 }
 
 function readNetworks() {
+  // Columns: A id | B title | C prompt | D type | E max_nominations
   const data = getSheet(NETWORKS_SHEET).getDataRange().getValues();
   const out = [];
   for (let i = 1; i < data.length; i++) {
     if (!data[i][0]) continue;
+    const rawType = String(data[i][3] || '').trim().toLowerCase();
+    const type = rawType === 'nomination' ? 'nomination' : 'allocation';
+    const maxNoms = Number(data[i][4]) || (type === 'nomination' ? 5 : 0);
     out.push({
       id: String(data[i][0]),
       title: String(data[i][1]),
-      prompt: String(data[i][2])
+      prompt: String(data[i][2]),
+      type: type,
+      max_nominations: maxNoms
     });
   }
   return out;
