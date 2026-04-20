@@ -39,10 +39,6 @@
       return;
     }
 
-    const datalist = `<datalist id="classmates-dl">${
-      data.classmates.map(c => `<option value="${esc(c.name)}"></option>`).join('')
-    }</datalist>`;
-
     const sections = data.networks.map(n => {
       const prior = data.submissions[n.id];
       return n.type === 'nomination'
@@ -54,9 +50,9 @@
       <header class="survey">
         <h1>Network Survey</h1>
         <p class="subtitle">Hi ${esc(data.name)} — please complete each section below. Your answers save per section.</p>
+        <p class="notice">Network data will be anonymized before the class receives it. Some overall statistics (e.g., identity of about 3 highly central people on each dimension) may be shared.</p>
       </header>
-      ${sections}
-      ${datalist}`;
+      ${sections}`;
 
     for (const n of data.networks) {
       if (n.type === 'nomination') wireNomination(n.id, data.classmates);
@@ -151,12 +147,15 @@
       slots.push(`
         <div class="nom-slot">
           <span class="nom-num">${i + 1}.</span>
-          <input type="text" list="classmates-dl" class="nom-input"
-            data-network="${network.id}"
-            data-student-id="${esc(preId)}"
-            value="${esc(preName)}"
-            placeholder="Start typing a classmate's name…"
-            autocomplete="off">
+          <div class="nom-combo">
+            <input type="text" class="nom-input"
+              data-network="${network.id}"
+              data-student-id="${esc(preId)}"
+              value="${esc(preName)}"
+              placeholder="Start typing a classmate's name…"
+              autocomplete="off" spellcheck="false">
+            <ul class="nom-dropdown" role="listbox" hidden></ul>
+          </div>
           <button type="button" class="nom-clear" aria-label="Clear">×</button>
         </div>`);
     }
@@ -175,7 +174,10 @@
   }
 
   function wireNomination(networkId, classmates) {
-    const nameToId = Object.fromEntries(classmates.map(c => [c.name, c.student_id]));
+    // Case-insensitive name -> id lookup (exact label, any case).
+    const nameToId = {};
+    for (const c of classmates) nameToId[c.name.toLowerCase()] = c.student_id;
+
     const section = document.getElementById('section-' + networkId);
     const inputs = section.querySelectorAll('.nom-input');
     const countEl = document.getElementById('count-' + networkId);
@@ -192,7 +194,7 @@
           i.dataset.studentId = '';
           return;
         }
-        const sid = nameToId[v];
+        const sid = nameToId[v.toLowerCase()];
         if (!sid || picked.has(sid)) {
           i.classList.add('bad');
           i.dataset.studentId = '';
@@ -210,10 +212,8 @@
       btn.disabled = invalid > 0;
     }
 
-    inputs.forEach(i => {
-      i.addEventListener('input', recompute);
-      i.addEventListener('change', recompute);
-      i.addEventListener('blur', recompute);
+    inputs.forEach(input => {
+      attachAutocomplete(input, classmates, recompute);
     });
     section.querySelectorAll('.nom-clear').forEach((b, idx) => {
       b.addEventListener('click', () => {
@@ -232,6 +232,95 @@
       });
       await submitSection(networkId, allocations, btn, resEl);
       recompute();
+    });
+  }
+
+  /**
+   * Case-insensitive autocomplete on a single text input. Shows a filtered
+   * dropdown of matching classmates; supports keyboard (↑/↓/Enter/Esc) and
+   * mouse selection. Fixes the native <datalist> quirk where some browsers
+   * don't surface matches for lowercase-typed prefixes.
+   */
+  function attachAutocomplete(input, classmates, onChange) {
+    const combo = input.parentElement; // .nom-combo
+    const dropdown = combo.querySelector('.nom-dropdown');
+    let matches = [];
+    let hi = -1;
+
+    function filter() {
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        matches = [];
+        hi = -1;
+        dropdown.hidden = true;
+        dropdown.innerHTML = '';
+        return;
+      }
+      // Rank: prefix matches first, then substring matches.
+      const prefix = [];
+      const sub = [];
+      for (const c of classmates) {
+        const lc = c.name.toLowerCase();
+        if (lc.startsWith(q)) prefix.push(c);
+        else if (lc.indexOf(q) >= 0) sub.push(c);
+      }
+      matches = prefix.concat(sub).slice(0, 10);
+      hi = matches.length > 0 ? 0 : -1;
+      render();
+    }
+
+    function render() {
+      if (matches.length === 0) {
+        dropdown.hidden = true;
+        dropdown.innerHTML = '';
+        return;
+      }
+      dropdown.innerHTML = matches.map((m, i) =>
+        `<li role="option" data-idx="${i}"${i === hi ? ' class="hl"' : ''}>${esc(m.name)}</li>`
+      ).join('');
+      dropdown.hidden = false;
+    }
+
+    function pick(idx) {
+      if (idx < 0 || idx >= matches.length) return;
+      input.value = matches[idx].name;
+      dropdown.hidden = true;
+      matches = [];
+      hi = -1;
+      onChange();
+    }
+
+    input.addEventListener('input', filter);
+    input.addEventListener('focus', filter);
+    input.addEventListener('blur', () => {
+      // delay so mousedown on dropdown can fire first
+      setTimeout(() => { dropdown.hidden = true; }, 150);
+    });
+    input.addEventListener('keydown', e => {
+      if (dropdown.hidden || matches.length === 0) {
+        if (e.key === 'Enter') onChange();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        hi = (hi + 1) % matches.length;
+        render();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        hi = (hi - 1 + matches.length) % matches.length;
+        render();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        pick(hi);
+      } else if (e.key === 'Escape') {
+        dropdown.hidden = true;
+      }
+    });
+    dropdown.addEventListener('mousedown', e => {
+      const li = e.target.closest('li[role="option"]');
+      if (!li) return;
+      e.preventDefault(); // keep input focused; don't trigger blur first
+      pick(Number(li.dataset.idx));
     });
   }
 
